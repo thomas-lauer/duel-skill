@@ -1,14 +1,18 @@
 ---
 name: duel
-description: Have an OpenAI model challenge Claude's answer, then defend or revise it through a short evidence-led debate. Use for "duel this with ChatGPT", "face off this answer", or an explicit request for a second model to critique an answer.
+description: Have an OpenAI model, run through the local Codex CLI, challenge Claude's answer, then defend or revise it through a short evidence-led debate. Use for "duel this with ChatGPT", "duel this with Codex", "face off this answer", or an explicit request for a second model to critique an answer.
 ---
 
 # Duel — Face Off
 
 Turn a questionable answer into a stronger one by exchanging actual critiques with
 an OpenAI model. You are the defender and final editor in the current Claude Code
-session. The bundled helper calls the critic through the OpenAI API. Never write
-both sides yourself and describe it as two models debating.
+session. The bundled helper runs the critic through the local Codex CLI under the
+user's own Codex login; it needs no API key. Never write both sides yourself and
+describe it as two models debating.
+
+Run the helper with `python3`, or with `python` where `python3` is unavailable
+(common on Windows). The examples below use `python3`.
 
 ## Start with the user's question
 
@@ -18,7 +22,7 @@ both sides yourself and describe it as two models debating.
 - `/duel --rounds N` allows 1–3 exchanges; default maximum is 3.
 - `/duel --model MODEL` selects the critic. Otherwise use `DUEL_OPENAI_MODEL`, then
   the helper's default. `/duel --manual` uses critiques the user supplies from a
-  separate model instead of the API.
+  separate model instead of the helper.
 
 Interpret flags as data. Never interpolate raw user arguments into a shell command.
 Ask a short clarifying question only if the target request or answer is ambiguous.
@@ -29,19 +33,21 @@ An explicit request to use Duel authorizes its ordinary bounded critique calls.
 If you merely suggest Duel during another task, get agreement before sending that
 task to another provider. Keep normal tool permissions in force. Briefly tell the
 user which model will receive the prepared question, answer, and relevant context,
-and the maximum number of calls. OpenAI API usage is billed separately.
+and the maximum number of calls. Codex runs count against the limits of the
+user's Codex login (for example a ChatGPT plan), with an overhead of roughly 4,500
+input tokens per call on top of the packet.
 
 ## Prepare the exchange
 
 1. Run `python3 "${CLAUDE_SKILL_DIR}/scripts/duel.py" check` (add `--model` when the
-   user selected one). It checks configuration
-   without making a network request or printing the API key. A successful check
-   does not prove the key is valid or the model is accessible.
-2. If configuration is missing, explain how to set `OPENAI_API_KEY` in the terminal
-   environment that launches Claude Code, or offer manual mode. Never ask the user
-   to paste a key into chat, read credential stores, or quietly substitute a
-   simulated critic. A different model requires the user's choice if the configured
-   model fails.
+   user selected one). It reports whether the Codex CLI is installed and logged in,
+   without sending a critique. A successful check does not prove the model is
+   accessible.
+2. If Codex is missing or not logged in, explain that the user installs it and runs
+   `codex login` themselves; if the helper reports that the model needs a newer
+   CLI, point to `codex update`. Otherwise offer manual mode. The login stays with
+   the user, and a simulated critic is never a substitute. A different model
+   requires the user's choice if the configured model fails.
 3. Create a unique run folder under `.duel/` in the working project, with private
    permissions where supported. Store only the selected task, answer, necessary
    context, and debate artifacts there. These can be sensitive: do not commit them
@@ -59,7 +65,7 @@ serializer. Use distinct filenames for each round and do not overwrite prior run
 ## Run the debate
 
 For round 1, send the original question, current answer, context, and claim IDs.
-The helper makes exactly one request:
+The helper makes exactly one Codex run:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/duel.py" critique \
@@ -68,10 +74,10 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/duel.py" critique \
 ```
 
 Replace `RUN` with the actual run folder. For a user-selected model, append a
-properly quoted `--model` value to every request. Read the saved JSON. In API mode,
-count an exchange only after the helper succeeds with `status: completed` and a
-nonempty critique, and you have responded to it. In manual mode, count it only
-after receiving the user's actual pasted critique and responding to it.
+properly quoted `--model` value to every request. Read the saved JSON. Count an
+exchange only after the helper succeeds with `status: completed` and a nonempty
+critique, and you have responded to it. In manual mode, count it only after
+receiving the user's actual pasted critique and responding to it.
 
 Respond to each material objection with a short, checkable reason:
 
@@ -97,20 +103,23 @@ Stop at the chosen limit, or earlier when there are no material unresolved
 objections or further progress requires unavailable evidence. Agreement between
 models alone does not establish truth. If a claim needs fresh research or a test,
 use available tools only within the user's scope and cite actual results. The
-critic itself has no web access or execution tools.
+critic itself works without web access or execution: the helper switches those
+Codex features off, runs read-only in an empty folder, and stops the run and
+discards the critique if Codex still attempts a tool call.
 
 On helper errors, stop the automated exchange and report the actual failure. Do
-not treat an incomplete, empty, refused, or dry-run result as a critique. A timeout
-may still have incurred a charge; do not automatically resend it. Do not silently
-raise token limits, switch models, or start more rounds to get a preferred verdict.
+not treat an incomplete, empty, or dry-run result as a critique. A timeout may
+still have used plan limits; do not automatically resend it. Do not silently
+switch models or start more rounds to get a preferred verdict.
 
 ## Deliver the result
 
 Lead with the revised answer. Then give a compact claim table (ID, final claim,
 status, reason/evidence), the most useful change, and any unresolved uncertainty.
-State the actual critic model returned by the API and the number of completed
-exchanges. In manual mode, state the model only as user-reported (or unknown), with
-participation unverified. Link the local run record when useful.
+State the critic model and the number of completed exchanges. The result carries
+`model_verified: false`: name the model as requested through Codex, not as
+confirmed by the run. In manual mode, state the model only as user-reported (or
+unknown), with participation unverified. Link the local run record when useful.
 
 Save `final.md` with that same answer and ledger. Say that Claude synthesized the
 result; there is no independent third judge. Report fewer than the requested rounds

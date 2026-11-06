@@ -1,12 +1,12 @@
 {
   "name": "duel-skill",
-  "description": "The Duel (Face Off): Claude defends and revises its answer against a real OpenAI critic, with up to three rounds and a visible claim ledger.",
-  "version": "1.0.0",
+  "description": "The Duel (Face Off), Codex variant: Claude defends and revises its answer against an OpenAI critic run through the local Codex CLI, with up to three rounds and a visible claim ledger.",
+  "version": "1.1.0",
   "author": {
-    "name": "Jake Schincariol"
+    "name": "Thomas Lauer (Codex variant), based on the original by Jake Schincariol"
   },
-  "homepage": "https://github.com/Jakeschincariol/duel-skill",
-  "repository": "https://github.com/Jakeschincariol/duel-skill",
+  "homepage": "https://github.com/thomas-lauer/duel-skill",
+  "repository": "https://github.com/thomas-lauer/duel-skill",
   "license": "MIT",
   "keywords": [
     "claude-code",
@@ -14,6 +14,7 @@
     "debate",
     "critique",
     "duel",
-    "face-off"
+    "face-off",
+    "codex"
   ]
 }

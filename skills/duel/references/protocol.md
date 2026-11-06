@@ -1,7 +1,8 @@
 # Exchange protocol
 
-The helper makes one OpenAI Responses API request. Claude manages the local files,
-the rebuttal, and the final answer. It does not need an Anthropic API key.
+The helper makes one `codex exec` run per call, under the local Codex CLI login.
+Claude manages the local files, the rebuttal, and the final answer. No API key is
+involved, neither OpenAI nor Anthropic.
 
 ## Packet
 
@@ -59,11 +60,15 @@ instead of silently cutting relevant history.
 ```
 
 The helper refuses to overwrite an output file. A successful result contains
-`status`, `round`, `model`, `response_id`, `critique`, and `usage`. Preserve those
-metadata fields. Usage reports tokens from the API, not a calculated dollar cost.
-Round packet/reply files stay local; only the prepared packet and critic instructions
-are sent to OpenAI. The key is read from the process environment and never belongs
-in a packet or run record.
+`status`, `round`, `model`, `model_verified`, `response_id`, `critique`, and
+`usage`. Codex events do not report the serving model, so `model` is the requested
+one, `model_verified` is always `false`, and `response_id` is the Codex thread ID.
+Preserve those metadata fields. Usage reports tokens, not a calculated cost; it
+includes the agent's own prompt overhead. Round packet/reply files stay local;
+only the prepared packet and critic instructions go to OpenAI through Codex.
+Credentials never belong in a packet or run record. Codex receives only a fixed
+list of named environment variables (system paths, its home, proxy settings),
+so API keys and endpoint overrides in the parent environment never reach it.
 
 ## Controls
 
@@ -74,28 +79,40 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/duel.py" critique \
   --dry-run
 ```
 
-Dry-run validates the packet and writes the planned request without a key or a
-network call. It is useful for inspecting exactly what would leave the machine.
-It is not a model response and does not complete a debate round.
+Dry-run validates the packet and writes the planned Codex call without running
+Codex: the command line in `request.command`, the critic instructions in
+`request.instructions`, and the stdin text in `request.stdin`. It is useful for
+inspecting exactly what would leave the machine. It is not a model response and
+does not complete a debate round.
 
-Use `critique --help` for the available `--model`, `--timeout`, and
-`--max-output-tokens` controls. The default output cap is 8192 tokens per call,
-including reasoning tokens. A token cap is not a dollar budget. Do not increase it
-or repeat uncertain requests without the user's agreement. The helper has no
-automatic retries and sends no browsing or execution tools.
+Use `critique --help` for the available `--model` and `--timeout` controls. The
+default timeout is 300 seconds. Codex has no per-call output cap, so the timeout
+is the only bound. Do not raise it or repeat uncertain requests without the
+user's agreement. The helper itself never retries.
 
-The request uses `store: false`. That setting is not a promise of zero retention;
-OpenAI's account and API data policies still apply. The helper sends requests only
-to `https://api.openai.com/v1/responses`.
+### How the Codex call is bounded
+
+The helper runs `codex exec --json --ephemeral --ignore-user-config --ignore-rules
+--sandbox read-only` in a new empty temporary folder. The critic instructions
+replace Codex's built-in agent prompt through `model_instructions_file`, written
+to a temporary file next to that folder. The packet goes in on stdin, never on the
+command line. The skill list, permission, collaboration, app, and environment
+sections are left out of the prompt (`skills.include_instructions=false` and the
+`include_*` settings). What remains is about 4,500 tokens of tool definitions and
+the user's global `~/.codex/AGENTS.md`, which this Codex version always loads. It switches off web search and the shell, browser, computer-use,
+app, plugin, image, and sub-agent tool families. If Codex still emits any item
+other than a message, reasoning, or warning, the helper stops the process and
+discards the critique. Codex runs count against the limits of the Codex login,
+and the data policies of that account apply. The Codex CLI may retry transport
+errors internally; the helper cannot rule that out.
 
 ## Manual mode
 
-Generate a dry-run request file. Give the user `request.body.instructions` and
-the JSON text in `request.body.input[0].content[0].text` to paste into a separate
-model, excluding the API-only fields. Ask them
-to paste that model's actual response back. Do not claim to have accessed their
+Generate a dry-run request file. Give the user `request.instructions` and the
+packet text in `request.stdin` to paste into a separate model. Ask them to paste
+that model's actual response back. Do not claim to have accessed their
 ChatGPT account or verified which model they used. Save the supplied critique in
-`round-N.manual.json`, separate from the helper's API output format:
+`round-N.manual.json`, separate from the helper's output format:
 
 ```json
 {
@@ -110,9 +127,9 @@ ChatGPT account or verified which model they used. Save the supplied critique in
 
 Replace `model` with the user's reported model only when supplied. Do not invent
 response IDs or token usage. Continue the same claim/revision process, counting an
-exchange after the actual critique and Claude's response are both present. API
-credentials are not needed. Manual responses must never be described as
-API-verified results; a generated prompt alone completes zero exchanges.
+exchange after the actual critique and Claude's response are both present. Codex
+is not needed. Manual responses must never be described as helper results; a
+generated prompt alone completes zero exchanges.
 
 ## Worked example: the evidence boundary
 

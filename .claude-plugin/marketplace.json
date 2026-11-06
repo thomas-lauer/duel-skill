@@ -1,17 +1,17 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "duel-skill",
-  "description": "The Duel (Face Off) skill for Claude Code",
+  "description": "The Duel (Face Off) skill for Claude Code, Codex variant",
   "owner": {
-    "name": "Jake Schincariol"
+    "name": "Thomas Lauer"
   },
   "plugins": [
     {
       "name": "duel-skill",
-      "description": "Challenge Claude's answer with a real OpenAI critic, then track what Claude retains, revises, drops, or leaves unresolved.",
+      "description": "Challenge Claude's answer with an OpenAI critic run through the local Codex CLI, then track what Claude retains, revises, drops, or leaves unresolved.",
       "source": "./",
       "category": "productivity",
-      "homepage": "https://github.com/Jakeschincariol/duel-skill"
+      "homepage": "https://github.com/thomas-lauer/duel-skill"
     }
   ]
 }
