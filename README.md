@@ -1,4 +1,4 @@
-# The Duel skill (Codex variant)
+# The Duel skill (Codex CLI variant)
 
 **Make Claude defend its answer against another model.** The Duel, also called Face Off, sends an
 answer to an OpenAI model for a critique. Claude defends what holds up, revises what does not, and
